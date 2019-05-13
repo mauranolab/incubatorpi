@@ -1,7 +1,7 @@
 # incubatorpi
 ```
 Raspberry pi code to monitor and alert based on RJ11 incubator alarm signals
-Written by Henry Berger
+Written by Henri Berger
 
 The Incubator Alarms are Raspberry Pi Systems plugged into the various incubators which detect alarm states and send out alerts.
 The raspberry pis are running the following headless version of raspbian:
