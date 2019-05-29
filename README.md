@@ -1,7 +1,7 @@
 # incubatorpi
 ```
 Raspberry pi code to monitor and alert based on RJ11 incubator alarm signals
-Written by Henri Berger
+Initially written by Henri Berger
 
 The Incubator Alarms are Raspberry Pi Systems plugged into the various incubators which detect alarm states and send out alerts.
 The raspberry pis are running the following headless version of raspbian:
@@ -20,4 +20,7 @@ This entry can be modified by the following command (After ssh-ing into the rasp
 sudo crontab -e
 and you should see this:
 @reboot python3 /home/pi/Alarm/2018-10-05_Incubator_Sensor.py
+
+When you have updated the script, reboot to load the new version:
+sudo reboot
 ```
