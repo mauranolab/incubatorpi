@@ -13,7 +13,7 @@ from logging.handlers import TimedRotatingFileHandler
 ###Global parameters to be configured per alarm
 alarmname = 'Maurano_SB848'
 to_emails = ['maurano@nyu.edu', 'ranbroshran@gmail.com', 'martij44@nyu.edu']
-
+incubatornames = ['Incubator #1', 'Incubator #2', 'Incubator #3', 'Incubator #4']
 
 ###Utility functions
 def led_blink(color,state):
@@ -47,8 +47,8 @@ def send_email(user, pwd, recipient, subject, body):
 
 
 #%% in message will be replaced by incubator number
-def broadcast_message(to_emails, logger, alarmname, incubator, message):
-    message = message.replace('%%', str(incubator))
+def broadcast_message(logger, to_emails, alarmname, incubatornames, incubatornum, message):
+    message = message.replace('%%', str(incubatornum) + ' (' + incubatornames[incubatornum-1] + ')')
     body = alarmname + ' - ' + message + '\n\n' + str(datetime.now())
     
     logger(message)
@@ -114,14 +114,14 @@ while True:
         
         if (my_dt_ob.day)%7 == 1 and my_dt_ob.hour == 10 and weeklytest == False:
             #if my_dt_ob.hour == 10 and weeklytest == False
-            broadcast_message(to_emails, logger.info, alarmname, None, 'Weekly heartbeat - still running')
+            broadcast_message(logger.info, to_emails, alarmname, None, None, 'Weekly heartbeat - still running')
             weeklytest = True
         elif my_dt_ob.hour == 11:
             weeklytest = False
         
         
         if my_dt_ob.second < 5 and my_dt_ob.minute == 0:
-            logger.info('Hourly heartbeat - still running')
+            logger.debug('Hourly heartbeat - still running')
         
         
         ###Check current status
@@ -134,7 +134,7 @@ while True:
         if 0 not in status:
             indicator = 'green'
             if alarm == True and alarm_check == True:
-                broadcast_message(to_emails, logger.critical, alarmname, alarm_number, 'Incubator #%% has recovered')
+                broadcast_message(logger.critical, to_emails, alarmname, incubatornames, alarm_number, 'Incubator #%% has recovered')
                 alarm = False #updating previous alarm state to clear
         else:
             indicator = 'red'
@@ -142,7 +142,7 @@ while True:
                 if status[i] == 0: #checking for current alarm state
                     if alarm == False: #check for previous alarm state
                         alarm_number = i+1
-                        alarm_check = broadcast_message(to_emails, logger.critical, alarmname, alarm_number, 'Alarm detected in incubator #%%')
+                        alarm_check = broadcast_message(logger.critical, to_emails, alarmname, incubatornames, alarm_number, 'Alarm detected in incubator #%%')
                         alarm = True #updating previous alarm state to alarmed
                     
         led_blink(indicator,1)
