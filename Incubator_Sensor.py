@@ -80,12 +80,12 @@ logger = logging.getLogger("IncubatorAlarmLog")
 logger.setLevel(logging.DEBUG)
 
 handler1 = TimedRotatingFileHandler('/home/pi/Alarm/Log/' + alarmname + ".txt", when="D", interval=30, backupCount=1000)
-handler1.setFormatter(logging.Formatter('%(asctime)s %(levelname)-8s ' + alarmname + ' %(message)s', datefmt='%Y-%m-%d %H:%M'))
+handler1.setFormatter(logging.Formatter('%(asctime)s %(levelname)-8s ' + alarmname + ' %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
 handler1.setLevel(logging.INFO)
 logger.addHandler(handler1)
 
 handler2 = logging.StreamHandler()
-handler2.setFormatter(logging.Formatter('%(asctime)s %(levelname)-8s ' + alarmname + ' %(message)s', datefmt='%Y-%m-%d %H:%M'))
+handler2.setFormatter(logging.Formatter('%(asctime)s %(levelname)-8s ' + alarmname + ' %(message)s', datefmt='%Y-%m-%d %H:%M:%s'))
 logger.addHandler(handler2)
 
 
@@ -99,9 +99,9 @@ def sigterm_handler(_signo, _stack_frame):
 signal.signal(signal.SIGTERM, sigterm_handler)
 
 
-alarm = False
-alarm_check = True
-weeklytest = True
+alarm = False #Whether we are in an alarm state
+alarm_check = True #Whether the alarm has been successfully reported
+weeklytest = False #Whether we are in the weekly heartbeat announcement
 
 
 logger.critical('Started up successfully')
