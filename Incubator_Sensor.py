@@ -48,7 +48,8 @@ def send_email(user, pwd, recipient, subject, body):
 
 #%% in message will be replaced by incubator number
 def broadcast_message(logger, to_emails, alarmname, incubatornames, incubatornum, message):
-    message = message.replace('%%', str(incubatornum) + ' (' + incubatornames[incubatornum-1] + ')')
+    if incubatornames is not None and incubatornum is not None:
+        message = message.replace('%%', str(incubatornum) + ' (' + incubatornames[incubatornum-1] + ')')
     body = alarmname + ' - ' + message + '\n\n' + str(datetime.now())
     
     logger(message)
