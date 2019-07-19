@@ -28,7 +28,7 @@ def led_blink(color,state):
 
 
 #Will pass on any exceptions for send failure
-def send_email(user, pwd, recipient, subject, body):
+def send_email(user, recipient, subject, body):
     FROM = user
     TO = recipient if type(recipient) is list else [recipient]
     SUBJECT = subject
@@ -54,17 +54,20 @@ def broadcast_message(logger, to_emails, alarmname, incubatornames, incubatornum
     
     logger(message)
     
-    double_check = True
-    for email in to_emails:
+    success = False
+    while not success and len(to_emails) >= 1:
         try:
             #TODO Wrong severity level
-            logger("Sending email to " + email)
-            send_email('andrew.martin@nyumc.org ', '', email, alarmname + ' - ' + message, body)
+            logger("Sending email to " + ",".join(to_emails))
+            send_email('andrew.martin@nyulangone.org', to_emails, alarmname + ' - ' + message, body)
+            success = True
         except Exception:
-            #TODO Wrong severity level
-            logger("ERROR failed to send email to " + email)
-            double_check = False
-    return double_check
+            logger("Failed to send email to " + ",".join(to_emails))
+            success = False
+            #Try again out of paranoia after blindly truncating the last recipient from to_emails; send_email doesn't seem to check for a valid address beyond a@b.com, but just in case...
+            #NB couldn't figure out how to test this condition, putting an address invalid on its own into to_emails doesn't trigger an SMTP error
+            to_emails = to_emails[-1]
+    return success
 
 
 ###Main code begins here
@@ -113,8 +116,8 @@ while True:
         ###Check whether we should send a heartbeat message
         my_dt_ob = datetime.now()
         
-        if (my_dt_ob.day)%7 == 1 and my_dt_ob.hour == 10 and weeklytest == False:
-            #if my_dt_ob.hour == 10 and weeklytest == False
+        #Send the heartbeat message on Mondays at 10:00am
+        if my_dt_ob.weekday() == 0 and my_dt_ob.hour == 10 and weeklytest == False:
             broadcast_message(logger.info, to_emails, alarmname, None, None, 'Weekly heartbeat - still running')
             weeklytest = True
         elif my_dt_ob.hour == 11:
@@ -145,7 +148,7 @@ while True:
                         alarm_number = i+1
                         alarm_check = broadcast_message(logger.critical, to_emails, alarmname, incubatornames, alarm_number, 'Alarm detected in incubator #%%')
                         alarm = True #updating previous alarm state to alarmed
-                    
+        
         led_blink(indicator,1)
         time.sleep(2)
         led_blink(indicator,0)
