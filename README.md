@@ -12,14 +12,14 @@ Once connected to the nyu network, the raspberry pis are auto assigned a local I
 For example the prototype alarm is pi@10.148.19.148
 The prototype uses default login
 The systems have an "Alarm" folder in the home directory, which contains the python script that deos all the work.
- - home/pi/Alarm/2018-10-05_Incubator_Sensor.py
+ - home/pi/Alarm/Incubatorpi.py
 While running, this script monitors the incubators, generates logs and sends emails in the event of an alarm state.
 The systems have an entry in their crontab so they they start the monitoring python script on every boot.
-@reboot python3 /home/pi/Alarm/2018-10-05_Incubator_Sensor.py
+@reboot python3 /home/pi/Alarm/Incubatorpi.py
 This entry can be modified by the following command (After ssh-ing into the raspberry)
 sudo crontab -e
 and you should see this:
-@reboot python3 /home/pi/Alarm/2018-10-05_Incubator_Sensor.py
+@reboot python3 /home/pi/Alarm/Incubatorpi.py
 
 When you have updated the script, reboot to load the new version:
 sudo reboot
