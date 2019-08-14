@@ -62,7 +62,7 @@ def broadcast_message(logger, to_emails, alarmname, incubatornames, status, incu
         body += '\n'
     body += 'Current time: ' + str(datetime.now()) + '\n'
     runtime = datetime.now() - startupdate
-    body += 'Running since: ' + str(startupdate) + ' (%d days, %d hours and %d minutes)\n' % (runtime.days, runtime.seconds/3600, runtime.seconds/60)
+    body += 'Running since: ' + str(startupdate) + ' (%d days, %d hours and %d minutes)\n' % (runtime.days, runtime.seconds/3600, (runtime.seconds/60)-60*int(runtime.seconds/3600))
     
     logger(message)
     
