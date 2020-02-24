@@ -9,6 +9,7 @@ import sys
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import configparser
+import socket
 
 
 ###Utility functions
@@ -21,6 +22,20 @@ def led_blink(color,state):
     elif color == 'red':
         pin = 40
     IO.output(pin,state)
+
+
+#https://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
 
 
 #Will pass on any exceptions for send failure
@@ -58,8 +73,9 @@ def broadcast_message(logger, to_emails, alarmname, incubatornames, status, incu
     if incubatornames is not None and status is not None:
         body += 'Current status: \n'
         for i in range(len(status)):
-            body += incubatornames[i] + ' :' + ['ALARM', 'OK'][status[i]] + "\n"
+            body += incubatornames[i] + ': ' + ['ALARM', 'OK'][status[i]] + "\n"
         body += '\n'
+    body += 'Hostname: ' + socket.gethostname() + ' (' + get_ip() + ')' + '\n'
     body += 'Current time: ' + str(datetime.now()) + '\n'
     runtime = datetime.now() - startupdate
     body += 'Running since: ' + str(startupdate) + ' (%d days, %d hours and %d minutes)\n' % (runtime.days, runtime.seconds/3600, (runtime.seconds/60)-60*int(runtime.seconds/3600))
@@ -79,8 +95,10 @@ def broadcast_message(logger, to_emails, alarmname, incubatornames, status, incu
             #tried logger.exception(msg) but get "AttributeError: 'function' object has no attribute 'exception'"
             if len(to_emails) > 1:
                 #Try again out of paranoia after blindly truncating the first recipient from to_emails; send_email doesn't seem to check for a valid address beyond a@b.com, but just in case...
-                #NB couldn't figure out how to test this condition, putting an address invalid on its own into to_emails doesn't trigger an SMTP error
+                body = "WARNING: failed to include " + to_emails[-1] + "as recipient; removed and tried again"
                 to_emails = to_emails[:-1]
+                #Give it some time in case there is a network issue
+                time.sleep(30)
             else:
                 #Nothing left to try
                 keeptrying = False
@@ -91,6 +109,7 @@ def broadcast_message(logger, to_emails, alarmname, incubatornames, status, incu
 basedir='/home/pi/Alarm/' #So we can find config file and log dirs
 senderemail='andrew.martin@nyulangone.org'
 smtpserver="smtp.nyumc.org"
+repeatinterval=30 #Frequency of reminder emails of ongoing alarm conditions (approximately in minutes)
 
 #Initialize default values in case we have an error parsing config file later on
 alarmname = 'Unknown'
@@ -101,7 +120,8 @@ incubatornames = ['Incubator 1', 'Incubator 2', 'Incubator 3', 'Incubator 4']
 startupdate = datetime.now()
 weeklytest = False #Whether we are in the weekly heartbeat announcement
 alarm = False #Whether we are in an alarm state
-status = [1, 1, 1, 1] # State vector of the incubators this cycle
+curAlarmRepeat = 0 #The number of main loop iterations since we last sent a reminder of an ongoing alarm condition
+status = [1, 1, 1, 1] # State vector of the incubators this cycle; initialize to all clear
 priorstatus = status # State vector of the incubators last cycle
 
 ###Configure logging
@@ -171,6 +191,10 @@ IO.setup(10, IO.IN, pull_up_down=IO.PUD_DOWN)
 IO.setup(8, IO.IN, pull_up_down=IO.PUD_DOWN)
 
 
+#NB network may not be fully up yet, so give it a bit of time
+time.sleep(60)
+logger.info('Connected to network as ' + socket.gethostname() + ' (' + get_ip() + ')')
+
 logger.critical('Finished startup')
 
 
@@ -183,6 +207,7 @@ while True:
         #Send the heartbeat message on Mondays at 10:00am
         if my_dt_ob.weekday() == 0 and my_dt_ob.hour == 10 and weeklytest == False:
             broadcast_message(logger.info, to_emails, alarmname, incubatornames, status, None, 'Weekly heartbeat - still running')
+            logger.info('Connected to network as ' + socket.gethostname() + ' (' + get_ip() + ')')
             weeklytest = True
         elif my_dt_ob.hour == 11:
             weeklytest = False
@@ -209,10 +234,12 @@ while True:
                 #We have just gone from 1+ incubator being in alarm state to all clear
                 broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, None, 'All incubators have recovered')
                 alarm = False #updating previous alarm state to clear
+                curAlarmRepeat = 0
         else:
             #1+ incubator is in alarm state
             indicator = 'red'
             alarm = True #updating previous alarm state to alarmed
+            curAlarmRepeat += 1
             for i in range(len(status)):
                 if status[i] != priorstatus[i]:
                     alarm_number = i+1
@@ -220,6 +247,11 @@ while True:
                         broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, alarm_number, 'New alarm detected in incubator #%%')
                     if status[i] == 1: # This incubator just recovered (another incubator must still be failed)
                         broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, alarm_number, 'Incubator #%% has recovered')
+                else:
+                    #Nothing has changed, we are still in an alarm state
+                    if curAlarmRepeat >= repeatinterval:
+                        broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, None, 'Ongoing alarm condition')
+                        curAlarmRepeat = 0
         
         #Sleep for 60 seconds to throttle the main control loop
         for i in range(0, 10):
