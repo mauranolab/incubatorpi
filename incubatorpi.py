@@ -80,7 +80,7 @@ def broadcast_message(logger, to_emails, alarmname, incubatornames, status, incu
             if len(to_emails) > 1:
                 #Try again out of paranoia after blindly truncating the first recipient from to_emails; send_email doesn't seem to check for a valid address beyond a@b.com, but just in case...
                 #NB couldn't figure out how to test this condition, putting an address invalid on its own into to_emails doesn't trigger an SMTP error
-                to_emails = to_emails[-1]
+                to_emails = to_emails[:-1]
             else:
                 #Nothing left to try
                 keeptrying = False
