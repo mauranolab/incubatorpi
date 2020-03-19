@@ -13,6 +13,23 @@ import socket
 
 
 ###Utility functions
+#Lookup table for the pin number used by incubators numbered 1 through 4
+incubatorToPinMapping = {1: 12, 2: 11, 3: 10, 4: 8}
+
+#Takes an incubator and returns the status code
+def getIncubatorStatus(i):
+    if i not in incubatorToPinMapping:
+        raise ValueError("Invalid incubator number " + str(i))
+    
+    if not incubatorsactive[i-1]: #convert from 1 to 0 index
+        #Suppresses alarm state
+        return 2
+    else:
+    #IO.input(pin) measures current status of the pin
+    #in this case, it returns either 0 or 1
+        return IO.input(incubatorToPinMapping[i])
+
+
 def led_blink(color,state):
     IO.setmode(IO.BOARD)
     IO.setup(40,IO.OUT)
@@ -73,7 +90,7 @@ def broadcast_message(logger, to_emails, alarmname, incubatornames, status, incu
     if incubatornames is not None and status is not None:
         body += 'Current status: \n'
         for i in range(len(status)):
-            body += incubatornames[i] + ': ' + ['ALARM', 'OK'][status[i]] + "\n"
+            body += incubatornames[i] + ': ' + ['ALARM', 'OK', 'UNMONITORED'][status[i]] + "\n"
         body += '\n'
     body += 'Hostname: ' + socket.gethostname() + ' (' + get_ip() + ')' + '\n'
     body += 'Current time: ' + str(datetime.now()) + '\n'
@@ -115,6 +132,7 @@ repeatinterval=30 #Frequency of reminder emails of ongoing alarm conditions (app
 alarmname = 'Unknown'
 to_emails = ['maurano@nyu.edu']
 incubatornames = ['Incubator 1', 'Incubator 2', 'Incubator 3', 'Incubator 4']
+incubatorsactive = [True, True, True, True]
 
 ###Initialize global variables
 startupdate = datetime.now()
@@ -158,6 +176,7 @@ logger.info("Reading configuration from alarm_config.ini")
 #alarmname=MyAlarmName
 #emails=test@nyu.edu,test2@nyu.edu
 #incubatornames=Incubator 1,Incubator 2,Incubator 3,Incubator 4
+#incubatorsactive=1,1,1,1
 
 ####Now that we have the configuration loaded add the logfile handler
 try:
@@ -172,9 +191,11 @@ try:
     
     to_emails = config.get('DEFAULT', 'emails').split(',')
     incubatornames = config.get('DEFAULT', 'incubatornames').split(',')
+    incubatorsactive = [ int(i)==1 for i in config.get('DEFAULT', 'incubatorsactive').split(',') ] #Parse and convert to logical
     logger.info("alarmname=" + alarmname)
     logger.info("to_emails=" + ",".join(to_emails))
     logger.info("incubatornames=" + ",".join(incubatornames))
+    logger.info("incubatorsactive=" + str(incubatorsactive))
 except Exception:
     msg = "Failed to read configuration, using hardcoded defaults"
     logger.exception(msg)
@@ -185,10 +206,11 @@ except Exception:
 
 ###Setting up input pins to detect incubator alarm.
 IO.setmode(IO.BOARD)
-IO.setup(12, IO.IN, pull_up_down=IO.PUD_DOWN) #DOWN = low voltage, Incubator Alarm Contacts 2-com, 3-N.O.
-IO.setup(11, IO.IN, pull_up_down=IO.PUD_DOWN)
-IO.setup(10, IO.IN, pull_up_down=IO.PUD_DOWN)
-IO.setup(8, IO.IN, pull_up_down=IO.PUD_DOWN)
+#DOWN = low voltage, Incubator Alarm Contacts 2-com, 3-N.O.
+IO.setup(incubatorToPinMapping[1], IO.IN, pull_up_down=IO.PUD_DOWN)
+IO.setup(incubatorToPinMapping[2], IO.IN, pull_up_down=IO.PUD_DOWN)
+IO.setup(incubatorToPinMapping[3], IO.IN, pull_up_down=IO.PUD_DOWN)
+IO.setup(incubatorToPinMapping[4], IO.IN, pull_up_down=IO.PUD_DOWN)
 
 
 #NB network may not be fully up yet, so give it a bit of time
@@ -218,11 +240,9 @@ while True:
         
         
         ###Check current status
-        #IO.input(pin) measures current status of the pin
-        #in this case, it returns either 0 or 1
         #In the all good state, status = [1, 1, 1, 1]
         priorstatus = status
-        status = [IO.input(12), IO.input(11), IO.input(10), IO.input(8)]
+        status = [ getIncubatorStatus(i) for i in range(1,4+1) ]
         
         #Print out status vector every 4 seconds
         #logger.debug("Incubator status: " + str(status))
