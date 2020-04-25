@@ -180,7 +180,6 @@ logger.info("Reading configuration from alarm_config.ini")
 
 ####Now that we have the configuration loaded add the logfile handler
 try:
-#    raise Exception("test")
     config = configparser.ConfigParser()
     config.read(basedir + 'alarm_config.ini')
     
