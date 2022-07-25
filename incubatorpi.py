@@ -225,8 +225,8 @@ while True:
         ###Check whether we should send a heartbeat message
         my_dt_ob = datetime.now()
         
-        #Send the heartbeat message on Mondays at 10:00am
-        if my_dt_ob.weekday() == 0 and my_dt_ob.hour == 10 and weeklytest == False:
+        #Send the heartbeat message on Fridays at 10:00am
+        if my_dt_ob.weekday() == 4 and my_dt_ob.hour == 10 and weeklytest == False:
             broadcast_message(logger.info, to_emails, alarmname, incubatornames, status, None, 'Weekly heartbeat - still running')
             logger.info('Connected to network as ' + socket.gethostname() + ' (' + get_ip() + ')')
             weeklytest = True
