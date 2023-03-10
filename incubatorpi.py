@@ -30,7 +30,8 @@ def getIncubatorStatus(i):
         return IO.input(incubatorToPinMapping[i])
 
 
-def led_blink(color,state):
+#Sets a given LED (color) to state (0/1)
+def set_led_state(color,state):
     IO.setmode(IO.BOARD)
     IO.setup(40,IO.OUT)
     IO.setup(38,IO.OUT)
@@ -124,7 +125,7 @@ def broadcast_message(logger, to_emails, alarmname, incubatornames, status, incu
 ###Main code begins here
 ###Initialize parameters not in the config file
 basedir='/home/pi/Alarm/' #So we can find config file and log dirs
-senderemail='andrew.martin@nyulangone.org'
+senderemail='VALIDEMAIL@nyulangone.org'
 smtpserver="smtp.nyumc.org"
 repeatinterval=30 #Frequency of reminder emails of ongoing alarm conditions (approximately in minutes)
 
@@ -222,6 +223,57 @@ logger.critical('Finished startup')
 ###Main loop
 while True:
     try:
+        #Print out status vector every cycle
+        logger.debug("Incubator status: " + str(status))
+        
+        ###Check current status
+        #In the all good state, status = [1, 1, 1, 1]
+        priorstatus = status
+        status = [ getIncubatorStatus(curIncubatorIndex) for curIncubatorIndex in range(1, 4+1) ]
+        
+        #Unmonitored incubators are guaranteed to return 2 by getIncubatorStatus(), so we don't need to handle them explicitly below
+        if 0 not in status:
+            #All clear
+            indicator = 'green'
+            if alarm == True:
+                #We have just gone from 1+ incubator being in alarm state to all clear
+                broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, None, 'All incubators have recovered')
+                alarm = False #updating previous alarm state to clear
+                curAlarmRepeat = 0
+        else:
+            logger.debug("Incubator status: " + str(status))
+            
+            #1+ incubator is in alarm state
+            #Both red and green LEDs will be off while we evaluate
+            curAlarmRepeat += 1
+            for curIncubatorIndex in range(len(status)):
+                curIncubatorNum = curIncubatorIndex+1
+                if status[curIncubatorIndex] != priorstatus[curIncubatorIndex]:
+                    if status[curIncubatorIndex] == 0: # This incubator just failed
+                        logger.warning('Potential alarm detected in incubator ' + str(curIncubatorNum))
+                        
+                        time.sleep(15)
+                        status[curIncubatorIndex] = getIncubatorStatus(curIncubatorNum)
+                        logger.debug("Incubator status after check: " + str(status))
+                        
+                        #it seems the state goes to 2 for a brief period (not sure if it's time or read cycles) after a test unplugging the cable
+                        if status[curIncubatorIndex] == 1:
+                            #This alarm went away after a short wait, suggesting it was just a transient. Log the event but clear the alarm state.
+                            logger.warning('Transient alarm detected in incubator ' + str(curIncubatorNum) + '; alarm signal no longer present.')
+                        else:
+                            #Still going, raise the alarm
+                            broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, curIncubatorNum, 'New alarm detected in incubator #%%')
+                            indicator = 'red'
+                            alarm = True #Only set the alarm state once we are sure at least one incubator has a clear alarm
+                    elif status[curIncubatorIndex] == 1: # This incubator just recovered (another incubator must still be failed)
+                        broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, curIncubatorNum, 'Incubator #%% has recovered')
+                else:
+                    #Nothing has changed, we are still in an alarm state
+                    if curAlarmRepeat >= repeatinterval:
+                        broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, None, 'Ongoing alarm condition')
+                        curAlarmRepeat = 0
+        
+        
         ###Check whether we should send a heartbeat message
         my_dt_ob = datetime.now()
         
@@ -238,46 +290,12 @@ while True:
             logger.debug('Hourly heartbeat - still running')
         
         
-        ###Check current status
-        #In the all good state, status = [1, 1, 1, 1]
-        priorstatus = status
-        status = [ getIncubatorStatus(i) for i in range(1,4+1) ]
-        
-        #Print out status vector every 4 seconds
-        #logger.debug("Incubator status: " + str(status))
-        
-        if 0 not in status:
-            #All clear
-            indicator = 'green'
-            if alarm == True:
-                #We have just gone from 1+ incubator being in alarm state to all clear
-                broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, None, 'All incubators have recovered')
-                alarm = False #updating previous alarm state to clear
-                curAlarmRepeat = 0
-        else:
-            #1+ incubator is in alarm state
-            indicator = 'red'
-            alarm = True #updating previous alarm state to alarmed
-            curAlarmRepeat += 1
-            for i in range(len(status)):
-                if status[i] != priorstatus[i]:
-                    alarm_number = i+1
-                    if status[i] == 0: # This incubator just failed
-                        broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, alarm_number, 'New alarm detected in incubator #%%')
-                    if status[i] == 1: # This incubator just recovered (another incubator must still be failed)
-                        broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, alarm_number, 'Incubator #%% has recovered')
-                else:
-                    #Nothing has changed, we are still in an alarm state
-                    if curAlarmRepeat >= repeatinterval:
-                        broadcast_message(logger.critical, to_emails, alarmname, incubatornames, status, None, 'Ongoing alarm condition')
-                        curAlarmRepeat = 0
-        
-        #Sleep for 60 seconds to throttle the main control loop
-        for i in range(0, 10):
-            led_blink(indicator,1)
+        ###Finally sleep  to throttle the main control loop
+        for i in range(0, 2):
             time.sleep(3)
-            led_blink(indicator,0)
+            set_led_state(indicator,1)
             time.sleep(3)
+            set_led_state(indicator,0)
     except Exception:
         logger.exception("Fatal error in main loop")
 
